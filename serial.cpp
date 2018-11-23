@@ -18,8 +18,8 @@ void printTime(float ms) {
     int intMS = ms;
     intMS %= 1000;
 
-    printf("Time Taken (Parallel) = %dh %dm %ds %dms\n", h, m, s, intMS);
-    printf("Time Taken in milliseconds : %d\n", intMS);
+    printf("Time Taken (Serial) = %dh %dm %ds %dms\n", h, m, s, intMS);
+    printf("Time Taken in milliseconds : %d\n", (int)ms);
 }
 
 double *betweennessCentrality(Graph *graph)
