@@ -16,16 +16,22 @@ double *betweennessCentrality(Graph *graph)
     const int nodeCount = graph->getNodeCount();
 
     double *bwCentrality = new double[nodeCount]();
+    vector<int> *predecessor = new vector<int>[nodeCount];
 
+    double *dependency = new double[nodeCount];
+    int *sigma = new int[nodeCount];
+    int *distance = new int[nodeCount];
+
+    printf("Progress... %3d%%", 0);
     for (int s = 0; s < nodeCount; s++)
     {
+        printf("\rProgress... %5.2f%%", (s+1)*100.0/nodeCount);
         stack<int> st;
-        vector<int> *predecessor = new vector<int>[nodeCount];
-        int *sigma = new int[nodeCount]();
-        int *distance = new int[nodeCount];
-
+        
         //FIXME: Change to initialize without O(V)
         memset(distance, -1, nodeCount * sizeof(int));
+        memset(sigma, 0, nodeCount * sizeof(int));
+        memset(dependency, 0, nodeCount * sizeof(double));
 
         distance[s] = 0;
         sigma[s] = 1;
@@ -56,8 +62,6 @@ double *betweennessCentrality(Graph *graph)
             }
         }
 
-        double *dependency = new double[nodeCount]();
-
         // st returns vertices in order of non-increasing distance from s
         while (!st.empty())
         {
@@ -75,11 +79,14 @@ double *betweennessCentrality(Graph *graph)
                 bwCentrality[w] += dependency[w] / 2;
             }
         }
-
-        // Free dynamic memory
-        delete[] sigma, dependency, distance, predecessor;
+        for(int i=0; i<nodeCount; ++i){
+            predecessor[i].clear();
+        }
     }
 
+    delete[] predecessor, sigma, dependency, distance;
+
+    cout << endl;
     return bwCentrality;
 }
 
@@ -110,19 +117,19 @@ int main(int argc, char *argv[])
     double *bwCentrality = betweennessCentrality(graph);
 
     end = clock();
-    float time_taken = 1000.0 * (end - start) / CLOCKS_PER_SEC;
+    float time_taken = 1.0 * (end - start) / (float)CLOCKS_PER_SEC;
 
     double maxBetweenness = -1;
     for (int i = 0; i < nodeCount; i++)
     {
         maxBetweenness = max(maxBetweenness, bwCentrality[i]);
         if (choice == 'y' || choice == 'Y')
-            printf("Node %distance => Betweeness Centrality %0.2lf\n", i, bwCentrality[i]);
+            printf("Node %d => Betweeness Centrality %0.2lf\n", i, bwCentrality[i]);
     }
 
     cout << endl;
     printf("\nMaximum Betweenness Centrality ==> %0.2lf\n", maxBetweenness);
-    printf("Time Taken (Serial) = %f ms\n", time_taken);
+    printf("Time Taken (Serial) = %0.2f s\n", time_taken);
 
     if (argc == 3)
     {
