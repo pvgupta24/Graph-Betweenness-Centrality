@@ -20,20 +20,36 @@ int main(int argc, char *argv[])
     int n, m;
     int x, y;
 
-    cout << "Enter number of nodes:";
+    cout << "Enter number of nodes: ";
     cin >> n;
-    cout << "Enter number of edges:";
+    cout << "Enter number of edges: ";
     cin >> m;
 
     freopen(argv[1], "w", stdout);
     cout << n << " " << m << endl;
 
+    vector<int> *v = new vector<int>[n+1];
     for (int i = 0; i < m; i++) {
         do {
             x = rand() % n;
             y = rand() % n;
         } while (x == y);
 
-        cout << x << " " << y << endl;
+        v[x].push_back(y);
+        v[y].push_back(x);
     }
+
+    cout << "0 ";
+    int cur = 0;
+    for(int i=0; i<n; i++) {
+        cur += v[i].size();
+        cout << cur << " ";
+    }
+    cout << endl;
+    for(int i=0; i<n; i++)
+        for(int it : v[i])
+            cout << it << " ";
+    cout << endl;
+
+    delete[] v;
 }
