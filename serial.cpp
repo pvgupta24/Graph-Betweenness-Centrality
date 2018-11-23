@@ -11,6 +11,17 @@ using namespace std;
 
 //=============================================================================================//
 
+void printTime(float ms) {
+    int h = ms / (1000*3600);
+    int m = (((int)ms) / (1000*60)) % 60;
+    int s = (((int)ms) / 1000) % 60;
+    int intMS = ms;
+    intMS %= 1000;
+
+    printf("Time Taken (Parallel) = %dh %dm %ds %dms\n", h, m, s, intMS);
+    printf("Time Taken in milliseconds : %d\n", intMS);
+}
+
 double *betweennessCentrality(Graph *graph)
 {
     const int nodeCount = graph->getNodeCount();
@@ -117,7 +128,7 @@ int main(int argc, char *argv[])
     double *bwCentrality = betweennessCentrality(graph);
 
     end = clock();
-    float time_taken = 1.0 * (end - start) / (float)CLOCKS_PER_SEC;
+    float time_taken = 1000.0 * (end - start) / (float)CLOCKS_PER_SEC;
 
     double maxBetweenness = -1;
     for (int i = 0; i < nodeCount; i++)
@@ -129,7 +140,7 @@ int main(int argc, char *argv[])
 
     cout << endl;
     printf("\nMaximum Betweenness Centrality ==> %0.2lf\n", maxBetweenness);
-    printf("Time Taken (Serial) = %0.2f s\n", time_taken);
+    printTime(time_taken);
 
     if (argc == 3)
     {
