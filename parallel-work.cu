@@ -52,10 +52,11 @@ inline void gpuAssert(cudaError_t error, const char *file, int line,  bool abort
             exit(-1);
     }
 }
+
 //=============================================================================================//
 
 __global__ void betweennessCentralityKernel(Graph *graph, double *bwCentrality, int nodeCount,
-            int *sigma, int *distance, double *dependency, int * distance2, int *Q, int *Q2) {
+            int *sigma, int *distance, double *dependency, int *Q, int *Qpointers) {
     
     int idx = threadIdx.x;
     if(idx >= nodeCount)
@@ -63,24 +64,26 @@ __global__ void betweennessCentralityKernel(Graph *graph, double *bwCentrality, 
     
     __shared__ int s;
     __shared__ int Q_len;
-    __shared__ int Q2_len;
+    __shared__ int Qpointers_len;
 
     if(idx == 0) {
         s = -1;
-        // printf("Progress... %3d%%", 0);
+        printf("Progress... %3d%%", 0);
     }
     __syncthreads();
 
-    while(s < 1 -1)
+    while(s < nodeCount -1)
     {    
         if(idx == 0)
         {
             ++s;
-            // printf("\rProgress... %5.2f%%", (s+1)*100.0/nodeCount);
+            printf("\rProgress... %5.2f%%", (s+1)*100.0/nodeCount);
             
             Q[0] = s;
             Q_len = 1;
-            Q2_len = 0;
+            Qpointers[0] = 0;
+            Qpointers[1] = 1;
+            Qpointers_len = 1;
         }
         __syncthreads();
 
@@ -97,7 +100,6 @@ __global__ void betweennessCentralityKernel(Graph *graph, double *bwCentrality, 
                 distance[v] = INT_MAX;
                 sigma[v] = 0;
             }
-            distance2[v] = INT_MAX;
             dependency[v] = 0.0;
         }
         __syncthreads();
@@ -107,23 +109,20 @@ __global__ void betweennessCentralityKernel(Graph *graph, double *bwCentrality, 
         // BFS
         while(true)
         {
-            if(idx == 0) {
-                printf("Q1: ");
-                for(int i=0; i<Q_len; i++)
-                    printf("%d | ", Q[i]);
-                printf("\n");
-            }
-
-            for(int k=idx; k<Q_len; k+=blockDim.x) //For each vertex...
+            __syncthreads();
+            for(int k=idx; k<Qpointers[Qpointers_len]; k+=blockDim.x) //For each vertex...
             {
+                if(k < Qpointers[Qpointers_len -1])
+                    continue;
+
                 int v = Q[k];
                 for(int r = graph->adjacencyListPointers[v]; r < graph->adjacencyListPointers[v + 1]; r++)
                 {
                     int w = graph->adjacencyList[r];
                     if(atomicCAS(&distance[w], INT_MAX, distance[v] +1) == INT_MAX)
                     {
-                        int t = atomicAdd(&Q2_len, 1);
-                        Q2[t] = w;
+                        int t = atomicAdd(&Q_len, 1);
+                        Q[t] = w;
                     }
                     if(distance[w] == (distance[v]+1))
                     {
@@ -133,54 +132,34 @@ __global__ void betweennessCentralityKernel(Graph *graph, double *bwCentrality, 
             }
             __syncthreads();
 
-            if(Q2_len == 0) 
-            {
-                for(int k=idx; k<Q_len; k+=blockDim.x)
-                    distance2[Q[k]] = 0;
-
+            if(Q_len == Qpointers[Qpointers_len])
                 break;
-            }
 
-            for(int k=idx; k<Q2_len; k+=blockDim.x)
-                Q[k] = Q2[k];
-
-            __syncthreads();
             if(idx == 0)
             {
-                Q_len = Q2_len;
-                Q2_len = 0;
+                Qpointers_len++;
+                Qpointers[Qpointers_len] = Q_len;
             }
             __syncthreads();
         }
         __syncthreads();
         
         // Reverse BFS
-        while(Q_len)
+        while(Qpointers_len > 0)
         {
-            if(idx == 0) {
-                printf("Q2: ");
-                for(int i=0; i<Q_len; i++)
-                    printf("%d | ", Q[i]);
-                printf("\n");
-            }
-
-            for(int k=idx; k<Q_len; k+=blockDim.x) //For each vertex...
+            for(int k=idx; k < Qpointers[Qpointers_len]; k+=blockDim.x) //For each vertex...
             {
+                if(k < Qpointers[Qpointers_len -1])
+                    continue;
+
                 int v = Q[k];
                 for(int r = graph->adjacencyListPointers[v]; r < graph->adjacencyListPointers[v + 1]; r++)
                 {
                     int w = graph->adjacencyList[r];
-                    if(atomicCAS(&distance2[w], INT_MAX, distance2[v] +1) == INT_MAX)
+                    if(distance[w] == (distance[v] + 1))
                     {
-                        int t = atomicAdd(&Q2_len, 1);
-                        Q2[t] = w;
-                    }
-                    if(distance2[w] == (distance2[v] - 1))
-                    {
-                        if (sigma[w] != 0) {
-                            printf("Down %d, up %d : down sigma %d, up sigma %d, dep %f\n", w, v, sigma[w], sigma[v], dependency[w]);
+                        if (sigma[w] != 0)
                             dependency[v] += (sigma[v] * 1.0 / sigma[w]) * (1 + dependency[w]);
-                        }
                     }
                 }
                 if (v != s)
@@ -191,15 +170,9 @@ __global__ void betweennessCentralityKernel(Graph *graph, double *bwCentrality, 
             }
             __syncthreads();
 
-            for(int k=idx; k<Q2_len; k+=blockDim.x)
-                Q[k] = Q2[k];
-
-            __syncthreads();
             if(idx == 0)
-            {
-                Q_len = Q2_len;
-                Q2_len = 0;
-            }
+                Qpointers_len--;
+
             __syncthreads();
         }
     }
@@ -209,15 +182,14 @@ double *betweennessCentrality(Graph *graph, int nodeCount)
 {
     double *bwCentrality = new double[nodeCount]();
     double *device_bwCentrality, *dependency;
-    int *sigma, *distance, *distance2, *Q, *Q2;
+    int *sigma, *distance, *Q, *Qpointers;
 
     //TODO: Allocate device memory for bwCentrality
     catchCudaError(cudaMalloc((void **)&device_bwCentrality, sizeof(double) * nodeCount));
     catchCudaError(cudaMalloc((void **)&sigma, sizeof(int) * nodeCount));
     catchCudaError(cudaMalloc((void **)&distance, sizeof(int) * nodeCount));
-    catchCudaError(cudaMalloc((void **)&distance2, sizeof(int) * nodeCount));
-    catchCudaError(cudaMalloc((void **)&Q, sizeof(int) * nodeCount));
-    catchCudaError(cudaMalloc((void **)&Q2, sizeof(int) * nodeCount));
+    catchCudaError(cudaMalloc((void **)&Q, sizeof(int) * (nodeCount +1)));
+    catchCudaError(cudaMalloc((void **)&Qpointers, sizeof(int) * (nodeCount +1)));
     catchCudaError(cudaMalloc((void **)&dependency, sizeof(double) * nodeCount));
     catchCudaError(cudaMemcpy(device_bwCentrality, bwCentrality, sizeof(double) * nodeCount, cudaMemcpyHostToDevice));
 
@@ -227,7 +199,7 @@ double *betweennessCentrality(Graph *graph, int nodeCount)
     catchCudaError(cudaEventCreate(&device_end));
     catchCudaError(cudaEventRecord(device_start));
 
-    betweennessCentralityKernel<<<1, MAX_THREAD_COUNT>>>(graph, device_bwCentrality, nodeCount, sigma, distance, dependency, distance2, Q, Q2);
+    betweennessCentralityKernel<<<1, MAX_THREAD_COUNT>>>(graph, device_bwCentrality, nodeCount, sigma, distance, dependency, Q, Qpointers);
     cudaDeviceSynchronize();
     //End of progress bar
     cout << endl;
@@ -243,9 +215,8 @@ double *betweennessCentrality(Graph *graph, int nodeCount)
     catchCudaError(cudaFree(sigma));
     catchCudaError(cudaFree(dependency));
     catchCudaError(cudaFree(distance));
-    catchCudaError(cudaFree(distance2));
     catchCudaError(cudaFree(Q));
-    catchCudaError(cudaFree(Q2));
+    catchCudaError(cudaFree(Qpointers));
     return bwCentrality;
 }
 
