@@ -37,7 +37,7 @@ void printTime(float ms) {
     intMS %= 1000;
 
     printf("Time Taken (Parallel) = %dh %dm %ds %dms\n", h, m, s, intMS);
-    printf("Time Taken in milliseconds : %d\n", intMS);
+    printf("Time Taken in milliseconds : %d\n", (int)ms);
 }
 
 // Catch Cuda errors
@@ -55,30 +55,32 @@ inline void gpuAssert(cudaError_t error, const char *file, int line,  bool abort
 //=============================================================================================//
 
 __global__ void betweennessCentralityKernel(Graph *graph, double *bwCentrality, int nodeCount,
-            int *sigma, int *distance, double *dependency) {
+            int *sigma, int *distance, double *dependency, int * distance2, int *Q, int *Q2) {
     
     int idx = threadIdx.x;
     if(idx >= nodeCount)
         return;
     
     __shared__ int s;
-    __shared__ int current_depth;
-    __shared__ bool done;
+    __shared__ int Q_len;
+    __shared__ int Q2_len;
 
     if(idx == 0) {
         s = -1;
-        printf("Progress... %3d%%", 0);
+        // printf("Progress... %3d%%", 0);
     }
     __syncthreads();
 
-    while(s < nodeCount)
+    while(s < 1 -1)
     {    
         if(idx == 0)
         {
             ++s;
-            printf("\rProgress... %5.2f%%", (s+1)*100.0/nodeCount);
-            done = false;
-            current_depth = -1;
+            // printf("\rProgress... %5.2f%%", (s+1)*100.0/nodeCount);
+            
+            Q[0] = s;
+            Q_len = 1;
+            Q2_len = 0;
         }
         __syncthreads();
 
@@ -95,70 +97,108 @@ __global__ void betweennessCentralityKernel(Graph *graph, double *bwCentrality, 
                 distance[v] = INT_MAX;
                 sigma[v] = 0;
             }
+            distance2[v] = INT_MAX;
             dependency[v] = 0.0;
         }
         __syncthreads();
         
         // Calculate the number of shortest paths and the 
         // distance from s (the root) to each vertex
-            
-        while(!done)
+        // BFS
+        while(true)
         {
-            if(idx == 0){
-                current_depth++;
+            if(idx == 0) {
+                printf("Q1: ");
+                for(int i=0; i<Q_len; i++)
+                    printf("%d | ", Q[i]);
+                printf("\n");
             }
-            done = true;
-            __syncthreads();
 
-            for(int v=idx; v<nodeCount; v+=blockDim.x) //For each vertex...
+            for(int k=idx; k<Q_len; k+=blockDim.x) //For each vertex...
             {
-                if(distance[v] == current_depth)
+                int v = Q[k];
+                for(int r = graph->adjacencyListPointers[v]; r < graph->adjacencyListPointers[v + 1]; r++)
                 {
-                    for(int r = graph->adjacencyListPointers[v]; r < graph->adjacencyListPointers[v + 1]; r++)
+                    int w = graph->adjacencyList[r];
+                    if(atomicCAS(&distance[w], INT_MAX, distance[v] +1) == INT_MAX)
                     {
-                        int w = graph->adjacencyList[r];
-                        if(distance[w] == INT_MAX)
-                        {
-                            distance[w] = distance[v] + 1;
-                            done = false;
-                        }
-                        if(distance[w] == (distance[v] + 1))
-                        {
-                            atomicAdd(&sigma[w], sigma[v]);
-                        }
+                        int t = atomicAdd(&Q2_len, 1);
+                        Q2[t] = w;
+                    }
+                    if(distance[w] == (distance[v]+1))
+                    {
+                        atomicAdd(&sigma[w], sigma[v]);
                     }
                 }
+            }
+            __syncthreads();
+
+            if(Q2_len == 0) 
+            {
+                for(int k=idx; k<Q_len; k+=blockDim.x)
+                    distance2[Q[k]] = 0;
+
+                break;
+            }
+
+            for(int k=idx; k<Q2_len; k+=blockDim.x)
+                Q[k] = Q2[k];
+
+            __syncthreads();
+            if(idx == 0)
+            {
+                Q_len = Q2_len;
+                Q2_len = 0;
             }
             __syncthreads();
         }
-
+        __syncthreads();
+        
         // Reverse BFS
-        while(current_depth)
+        while(Q_len)
         {
-            if(idx == 0){
-                current_depth--;
+            if(idx == 0) {
+                printf("Q2: ");
+                for(int i=0; i<Q_len; i++)
+                    printf("%d | ", Q[i]);
+                printf("\n");
+            }
+
+            for(int k=idx; k<Q_len; k+=blockDim.x) //For each vertex...
+            {
+                int v = Q[k];
+                for(int r = graph->adjacencyListPointers[v]; r < graph->adjacencyListPointers[v + 1]; r++)
+                {
+                    int w = graph->adjacencyList[r];
+                    if(atomicCAS(&distance2[w], INT_MAX, distance2[v] +1) == INT_MAX)
+                    {
+                        int t = atomicAdd(&Q2_len, 1);
+                        Q2[t] = w;
+                    }
+                    if(distance2[w] == (distance2[v] - 1))
+                    {
+                        if (sigma[w] != 0) {
+                            printf("Down %d, up %d : down sigma %d, up sigma %d, dep %f\n", w, v, sigma[w], sigma[v], dependency[w]);
+                            dependency[v] += (sigma[v] * 1.0 / sigma[w]) * (1 + dependency[w]);
+                        }
+                    }
+                }
+                if (v != s)
+                {
+                    // Each shortest path is counted twice. So, each partial shortest path dependency is halved.
+                    bwCentrality[v] += dependency[v] / 2;
+                }
             }
             __syncthreads();
 
-            for(int v=idx; v<nodeCount; v+=blockDim.x) //For each vertex...
+            for(int k=idx; k<Q2_len; k+=blockDim.x)
+                Q[k] = Q2[k];
+
+            __syncthreads();
+            if(idx == 0)
             {
-                if(distance[v] == current_depth)
-                {
-                    for(int r = graph->adjacencyListPointers[v]; r < graph->adjacencyListPointers[v + 1]; r++)
-                    {
-                        int w = graph->adjacencyList[r];
-                        if(distance[w] == (distance[v] + 1))
-                        {
-                            if (sigma[w] != 0)
-                                dependency[v] += (sigma[v] * 1.0 / sigma[w]) * (1 + dependency[w]);
-                        }
-                    }
-                    if (v != s)
-                    {
-                        // Each shortest path is counted twice. So, each partial shortest path dependency is halved.
-                        bwCentrality[v] += dependency[v] / 2;
-                    }
-                }
+                Q_len = Q2_len;
+                Q2_len = 0;
             }
             __syncthreads();
         }
@@ -169,12 +209,15 @@ double *betweennessCentrality(Graph *graph, int nodeCount)
 {
     double *bwCentrality = new double[nodeCount]();
     double *device_bwCentrality, *dependency;
-    int *sigma, *distance;
+    int *sigma, *distance, *distance2, *Q, *Q2;
 
     //TODO: Allocate device memory for bwCentrality
     catchCudaError(cudaMalloc((void **)&device_bwCentrality, sizeof(double) * nodeCount));
     catchCudaError(cudaMalloc((void **)&sigma, sizeof(int) * nodeCount));
     catchCudaError(cudaMalloc((void **)&distance, sizeof(int) * nodeCount));
+    catchCudaError(cudaMalloc((void **)&distance2, sizeof(int) * nodeCount));
+    catchCudaError(cudaMalloc((void **)&Q, sizeof(int) * nodeCount));
+    catchCudaError(cudaMalloc((void **)&Q2, sizeof(int) * nodeCount));
     catchCudaError(cudaMalloc((void **)&dependency, sizeof(double) * nodeCount));
     catchCudaError(cudaMemcpy(device_bwCentrality, bwCentrality, sizeof(double) * nodeCount, cudaMemcpyHostToDevice));
 
@@ -184,7 +227,7 @@ double *betweennessCentrality(Graph *graph, int nodeCount)
     catchCudaError(cudaEventCreate(&device_end));
     catchCudaError(cudaEventRecord(device_start));
 
-    betweennessCentralityKernel<<<1, MAX_THREAD_COUNT>>>(graph, device_bwCentrality, nodeCount, sigma, distance, dependency);
+    betweennessCentralityKernel<<<1, MAX_THREAD_COUNT>>>(graph, device_bwCentrality, nodeCount, sigma, distance, dependency, distance2, Q, Q2);
     cudaDeviceSynchronize();
     //End of progress bar
     cout << endl;
@@ -200,6 +243,9 @@ double *betweennessCentrality(Graph *graph, int nodeCount)
     catchCudaError(cudaFree(sigma));
     catchCudaError(cudaFree(dependency));
     catchCudaError(cudaFree(distance));
+    catchCudaError(cudaFree(distance2));
+    catchCudaError(cudaFree(Q));
+    catchCudaError(cudaFree(Q2));
     return bwCentrality;
 }
 
