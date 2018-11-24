@@ -1,10 +1,9 @@
 # Graph Betweenness Centrality for sparse graphs with CUDA C/C++
+<hr>
+<div style="display: block; text-align: right">
 
-<div style="text-align: right">
-
-[Ashwin Joisa](https://www.github.com/AJ163) - 16CO104
-
-[Praveen Kumar Gupta](https://www.github.com/pvgupt24) - 16CO235
+Ashwin Joisa - 16CO104<br>
+Praveen Kumar Gupta - 16CO235
 
 </div>
 
@@ -23,6 +22,8 @@ Mathematically, the Betweenness Centrality of a vertex v is defined as:
 Some of the use cases of Betweenness centrality includes finding the best
 locations for stores within cities, power grid contingency analysis, and
 community detection.
+
+<hr>
 
 ## Graph Generation and formats
 The adjacency matrix representation of storing Graphs take memory of the order
@@ -53,6 +54,8 @@ length E represent the head and tail vertices of each edge.
 For undirected, we treat each undirected edge as two directed edges.
 Adjacency List array of CSR format, is the same as `edgeList2` in COO format.
 
+<hr>
+
 ## Brande's Algorithm
 The naive implementation of solving the all-pairs shortest paths problem is of
 the order of O(n<sup>3</sup>) by Floyd-Warshall technique and Betweeness Centrality
@@ -67,6 +70,7 @@ A recursive relation for defining the partial dependency(𝛿) w.r.t root node s
 ![Brande's Partial Dependency equation](https://s0.wp.com/latex.php?zoom=1.2999999523162842&latex=%5Cdelta_s%28v%29+%3D+%5Csum_%7Bw%3Av+%5Cin+pred%28w%29%7D+%5Cfrac%7B%5Csigma_%7Bsv%7D%7D%7B%5Csigma_%7Bsw%7D%7D%281+%2B+%5Cdelta_s%28w%29%29&bg=ffffff&fg=000&s=0)
 
 Effectively the calculation of BC values can then be divided into 2 steps:
+
 1. Calculating the partial dependencies w.r.t all nodes
 This is done by fixing a root and doing a forward Breadth First Search to calculate the depth of
 other nodes w.r.t the fixed root s
@@ -80,12 +84,16 @@ path from root to the current elements passes through them.
 
 This gives a running Time of O(V*E)
 
-### Serial Implementation
-### Parallel Implementation
-1. Vertex based
-2. Edge based
-3. Work efficient method (fine-grained parallelism)
-4. Work distributed method with coarse-grained parallelism
+We have implemented the following algorithms
+
+1. Serial Implementation
+2. Parallel Implementation
+    - Vertex based
+    - Edge based
+    - Work efficient method (fine-grained parallelism)
+    - Work distributed method with coarse-grained parallelism
+
+<hr>
 
 ## Running Instructions
 All the implementations can take in graphs in CSR formats and optionally store
@@ -156,8 +164,20 @@ Run the generated binary against the graphs generated in CSR formats as:
 > Note: Amount of blocks running in parallel can be controlled by changing the maximize
 GPU memory to be allocated in MAX_MEMORY. By default it uses a maximum of 4GB.
 
+<hr>
+
 ## Results and Analysis
 The implementations were tested and compared on the Nvidia P100 GPU.
+
+For the following given example graph:
+
+![Example Graph](https://drive.google.com/uc?id=1svIaPGkhNDE14zHpQ5WmtuqRCSlyoPF7)
+
+Output:
+
+![Example Graph Output](https://drive.google.com/uc?id=1eYx4Q5POnx-w7nlvlqRaXjaGyCQSr97t)
+
+<hr>
 
 ### Execution Time
 |Number of Vertices	|Serial	|Parallel Vertex	|Parallel Edge	|Parallel Work Efficient	|Parallel Work Efficient with Coarse grained Parallelism	|Max BC|
@@ -169,6 +189,8 @@ The implementations were tested and compared on the Nvidia P100 GPU.
 
 ![Running Time Comparision](https://drive.google.com/uc?id=1YSd5Lv1EMcV2EgkeyqxNYTUd4YBQ42Eq)
 
+<hr>
+
 ### Speed up with respect to Serial execution
 |Number of Vertices	|Vertex Parallel	|Edge Parallel 	|Work Efficient	|Work Efficient with Coarse grained Parallelism	|Max BC|
 |:---:|:---:|:---:|:---:|:---:|:---:|
@@ -178,17 +200,13 @@ The implementations were tested and compared on the Nvidia P100 GPU.
 
 ![Speedup Comparision](https://drive.google.com/uc?id=1O2EHJ46wh4gAAW33Z84z25t4lfhoFkf1)
 
-For the following given example graph:
-
-![Example Graph](https://drive.google.com/uc?id=1svIaPGkhNDE14zHpQ5WmtuqRCSlyoPF7)
-
-Output:
-
-![Example Graph Output](https://drive.google.com/uc?id=1eYx4Q5POnx-w7nlvlqRaXjaGyCQSr97t)
+<hr>
 
 ## What is unique in our Implementation?
 - Multiple blocks in a CUDA grid were used for parallelising partial dependencies for indpendent roots. This helped us achieve a coarse grained parallelism by processing each source independently in parallel. Fine grained parallelism was achieved by running a parallel BFS using optimal work distribution strategies.
 - Multi-sourced bottom up Breadth First Search for calculating dependency values of all nodes for a given source. A top down BFS was used to calculate the distance and number of shortest paths to each node with respect to a given source. Using these values, dependency values can were calculated by traversing the graph bottom up, using a multi-sourced bottom up Breadth First Search in parallel.
+
+<hr>
 
 ## References
 - https://devblogs.nvidia.com/accelerating-graph-betweenness-centrality-cuda/
