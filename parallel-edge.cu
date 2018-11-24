@@ -72,7 +72,7 @@ __global__ void betweennessCentralityKernel(Graph *graph, float *bwCentrality, i
 
     if(idx == 0) {
         s = -1;
-        printf("Progress... %3d%%", 0);
+        // printf("Progress... %3d%%", 0);
     }
     __syncthreads();
 
@@ -81,14 +81,13 @@ __global__ void betweennessCentralityKernel(Graph *graph, float *bwCentrality, i
         if (idx == 0)
         {
             ++s;
-            printf("\rProgress... %5.2f%%", (s+1)*100.0/nodeCount);
+            // printf("\rProgress... %5.2f%%", (s+1)*100.0/nodeCount);
             done = false;
             current_depth = -1;
         }
         __syncthreads();
     
     
-        //Initialize distance and sigma
         for (int i = idx; i < nodeCount; i += blockDim.x)
         {
             if (i == s)
@@ -108,7 +107,6 @@ __global__ void betweennessCentralityKernel(Graph *graph, float *bwCentrality, i
 
         while (!done)
         {
-            // TODO: Check if Needed
             __syncthreads();
 
             if (threadIdx.x == 0){
@@ -117,8 +115,8 @@ __global__ void betweennessCentralityKernel(Graph *graph, float *bwCentrality, i
             done = true;
             __syncthreads();
     
-            //TODO: Check if 2*graph->edgeCount + 1
-            for (int i = idx; i < (2*(graph->edgeCount)); i += blockDim.x) //For each edge...
+            
+            for (int i = idx; i < (2*(graph->edgeCount)); i += blockDim.x) 
             {
                 int v = graph->edgeList1[i];
                 if (distance[v] == current_depth)
@@ -139,11 +137,6 @@ __global__ void betweennessCentralityKernel(Graph *graph, float *bwCentrality, i
         }
         
         __syncthreads();
-        // if(idx == 0){
-        //     for(int w=0; w<nodeCount; ++w)
-        //         printf("Root %d : BC[%d] = %f\n", s, w, bwCentrality[w]);
-        //     printf("\n===========================\n");
-        // }
         
 
         // Reverse BFS
@@ -154,7 +147,7 @@ __global__ void betweennessCentralityKernel(Graph *graph, float *bwCentrality, i
             }
             __syncthreads();
 
-            for (int i = idx; i < (2*(graph->edgeCount)); i += blockDim.x) //For each edge...
+            for (int i = idx; i < (2*(graph->edgeCount)); i += blockDim.x) 
             {
                 int v = graph->edgeList1[i];
                 if(distance[v] == current_depth)
@@ -166,28 +159,13 @@ __global__ void betweennessCentralityKernel(Graph *graph, float *bwCentrality, i
                     {
                         if (sigma[w] != 0) {
                             atomicAdd(dependency + v, (sigma[v] * 1.0 / sigma[w]) * (1 + dependency[w]));
-                            // printf("v: %d, w: %d, sv: %d, sw: %d, dep[w]: %f\n", v, w, sigma[v], sigma[w], dependency[w]);
                         }
-                        // dependency[v] += (sigma[v] * 1.0 / sigma[w]) * (1 + dependency[w]);
+                       
                     }
-                    // }
-                    // if (v != s)
-                    // {
-                    //     // Each shortest path is counted twice. So, each partial shortest path dependency is halved.
-                    //     atomicAdd(bwCentrality + v, dependency[v] / 2);
-                    //     // bwCentrality[v] += dependency[v] / 2;
-                    // }
+  
                 }
             }
             __syncthreads();
-
-            
-            // __syncthreads();
-            // if(idx == 0){
-            //     for(int w=0; w<nodeCount; ++w)
-            //         printf("Root %d : dep[%d] = %f\n", s, w, dependency[w]);
-            //     printf("\n===========================\n");
-            // }
         }
 
         for(int v=idx; v<nodeCount; v+=blockDim.x){
@@ -195,7 +173,6 @@ __global__ void betweennessCentralityKernel(Graph *graph, float *bwCentrality, i
             {
                 // Each shortest path is counted twice. So, each partial shortest path dependency is halved.
                 bwCentrality[v] += dependency[v] / 2;
-                // printf("")
             }
         }
         __syncthreads();
