@@ -3,6 +3,8 @@
 *
 *   @author Ashwin Joisa
 *   @author Praveen Gupta
+*
+*   Compile with [g++ random_graph_generator.cpp -std=c++11]
 **/
 //=============================================================================================//
 
@@ -29,16 +31,21 @@ int main(int argc, char *argv[])
     cout << n << " " << m << endl;
 
     vector<int> *v = new vector<int>[n+1];
+
+    // srand(time(0));
+    // By defaut srand(0), so the generated graphs are same everytime
     for (int i = 0; i < m; i++) {
         do {
             x = rand() % n;
             y = rand() % n;
         } while (x == y);
 
+        // Edge between x and y
         v[x].push_back(y);
         v[y].push_back(x);
     }
 
+    // R
     cout << "0 ";
     int cur = 0;
     for(int i=0; i<n; i++) {
@@ -46,6 +53,8 @@ int main(int argc, char *argv[])
         cout << cur << " ";
     }
     cout << endl;
+
+    // C
     for(int i=0; i<n; i++)
         for(int it : v[i])
             cout << it << " ";
@@ -53,3 +62,19 @@ int main(int argc, char *argv[])
 
     delete[] v;
 }
+
+/*
+-------------------------------
+Example CSR format for
+nodes = 5
+edges = 5
+-------------------------------
+nodeCount edgeCount
+row offset
+column indices
+-------------------------------
+5 5
+0 2 5 7 9 10 
+2 3 3 2 4 0 1 1 0 1 
+-------------------------------
+*/
