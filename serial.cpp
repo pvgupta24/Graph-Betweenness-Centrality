@@ -33,13 +33,13 @@ double *betweennessCentrality(Graph *graph)
     int *sigma = new int[nodeCount];
     int *distance = new int[nodeCount];
 
-    printf("Progress... %3d%%", 0);
+    // printf("Progress... %3d%%", 0);
     for (int s = 0; s < nodeCount; s++)
     {
-        printf("\rProgress... %5.2f%%", (s+1)*100.0/nodeCount);
+        // printf("\rProgress... %5.2f%%", (s+1)*100.0/nodeCount);
         stack<int> st;
         
-        //FIXME: Change to initialize without O(V)
+        
         memset(distance, -1, nodeCount * sizeof(int));
         memset(sigma, 0, nodeCount * sizeof(int));
         memset(dependency, 0, nodeCount * sizeof(double));

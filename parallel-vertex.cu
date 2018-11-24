@@ -67,7 +67,7 @@ __global__ void betweennessCentralityKernel(Graph *graph, double *bwCentrality, 
 
     if(idx == 0) {
         s = -1;
-        printf("Progress... %3d%%", 0);
+        // printf("Progress... %3d%%", 0);
     }
     __syncthreads();
 
@@ -76,13 +76,12 @@ __global__ void betweennessCentralityKernel(Graph *graph, double *bwCentrality, 
         if(idx == 0)
         {
             ++s;
-            printf("\rProgress... %5.2f%%", (s+1)*100.0/nodeCount);
+            // printf("\rProgress... %5.2f%%", (s+1)*100.0/nodeCount);
             done = false;
             current_depth = -1;
         }
         __syncthreads();
 
-        //Initialize distance and sigma
         for(int v=idx; v<nodeCount; v+=blockDim.x)
         {
             if(v == s)
@@ -99,9 +98,8 @@ __global__ void betweennessCentralityKernel(Graph *graph, double *bwCentrality, 
         }
         __syncthreads();
         
-        // Calculate the number of shortest paths and the 
-        // distance from s (the root) to each vertex
-            
+       
+        // BFS    
         while(!done)
         {
             if(idx == 0){
@@ -110,7 +108,7 @@ __global__ void betweennessCentralityKernel(Graph *graph, double *bwCentrality, 
             done = true;
             __syncthreads();
 
-            for(int v=idx; v<nodeCount; v+=blockDim.x) //For each vertex...
+            for(int v=idx; v<nodeCount; v+=blockDim.x)
             {
                 if(distance[v] == current_depth)
                 {
@@ -140,7 +138,7 @@ __global__ void betweennessCentralityKernel(Graph *graph, double *bwCentrality, 
             }
             __syncthreads();
 
-            for(int v=idx; v<nodeCount; v+=blockDim.x) //For each vertex...
+            for(int v=idx; v<nodeCount; v+=blockDim.x) 
             {
                 if(distance[v] == current_depth)
                 {
