@@ -1,11 +1,8 @@
 # Graph Betweenness Centrality for sparse graphs with CUDA C/C++
-<hr>
-<div style="display: block; text-align: right">
 
-Ashwin Joisa - 16CO104<br>
-Praveen Kumar Gupta - 16CO235
+- [Ashwin Joisa](https://github.com/AJ163)
 
-</div>
+- [Praveen Kumar Gupta](https://github.com/pvgupta24)
 
 ## Introduction
 
@@ -92,6 +89,9 @@ We have implemented the following algorithms
     - Edge based
     - Work efficient method (fine-grained parallelism)
     - Work distributed method with coarse-grained parallelism
+
+- Multiple blocks in a CUDA grid were used for parallelising partial dependencies for indpendent roots. This helped us achieve a coarse grained parallelism by processing each source independently in parallel. Fine grained parallelism was achieved by running a parallel BFS using optimal work distribution strategies.
+- Multi-sourced bottom up Breadth First Search for calculating dependency values of all nodes for a given source. A top down BFS was used to calculate the distance and number of shortest paths to each node with respect to a given source. Using these values, dependency values can were calculated by traversing the graph bottom up, using a multi-sourced bottom up Breadth First Search in parallel.
 
 <hr>
 
@@ -199,12 +199,6 @@ Output:
 |10<sup>5</sup>	|1.51	|2.57	|7.60	|56.00	|13591397.85|
 
 ![Speedup Comparision](https://drive.google.com/uc?id=1O2EHJ46wh4gAAW33Z84z25t4lfhoFkf1)
-
-<hr>
-
-## What is unique in our Implementation?
-- Multiple blocks in a CUDA grid were used for parallelising partial dependencies for indpendent roots. This helped us achieve a coarse grained parallelism by processing each source independently in parallel. Fine grained parallelism was achieved by running a parallel BFS using optimal work distribution strategies.
-- Multi-sourced bottom up Breadth First Search for calculating dependency values of all nodes for a given source. A top down BFS was used to calculate the distance and number of shortest paths to each node with respect to a given source. Using these values, dependency values can were calculated by traversing the graph bottom up, using a multi-sourced bottom up Breadth First Search in parallel.
 
 <hr>
 
