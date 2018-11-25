@@ -1,7 +1,6 @@
 # Graph Betweenness Centrality for sparse graphs with CUDA C/C++
 
 - [Ashwin Joisa](https://github.com/AJ163)
-
 - [Praveen Kumar Gupta](https://github.com/pvgupta24)
 
 ## Introduction
